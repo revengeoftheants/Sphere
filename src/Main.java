@@ -8,14 +8,11 @@ import remixlab.proscene.*;
 
 public class Main extends PApplet {
 
-	float res = 5;
-	float moonRadius = (float) 1737.0;	//mean radius of the moon in kilometers
-	float modelRadius = (float) 300.0;	//mean radius of the model in pixels (so that it fits into the viewport)
-	String pathToFile = "craterTest.csv";
-	Scene camScene;
-
-	Sphere theMoon;
-	String planetName = "The Moon";
+	float _modelResNbr = 5;
+	float _modelRadiusNbr = (float) 300.0;	//mean radius of the model in pixels (so that it fits into the viewport)
+	Scene _camScene;
+	Sphere _thisSphere;
+	
 	
 	public static void main(String args[]) {
 		PApplet.main(new String[] { "Main" });
@@ -28,29 +25,31 @@ public class Main extends PApplet {
 		
 		setupCamera();
 		
-		theMoon = new Sphere(this, planetName, res, moonRadius, modelRadius);
-		theMoon.loadCraters(pathToFile); //load the craters and create the vertices
+		_thisSphere = new Sphere(this, _modelResNbr, _modelRadiusNbr);
 	}
 	
 	
 	public void draw() {
 		background(109,108,120);
 		smooth();
-		lights();
+		ambientLight(128, 128, 128);
+		directionalLight(128, 128, 128, 0, 0, -1);
+		lightFalloff(1, 0, 0);
+		lightSpecular(0, 0, 0);
         
-        theMoon.createVertices();
+        _thisSphere.createVertices();
         
         // Draw the body inside its own InteractiveFrame. You must apply its transformation in order to use its coordinate system.
         pushMatrix();
-        camScene.interactiveFrame().applyTransformation();
+        _camScene.interactiveFrame().applyTransformation();
         //camScene.drawAxis(modelRadius + 50);
         
-		stroke(255, 129, 94);
-		strokeWeight(2);
+		//stroke(255, 129, 94);
+		strokeWeight(1);
         fill(255, 94, 94);
         
         rotateX(HALF_PI);
-		theMoon.drawSphere();
+		_thisSphere.drawSphere();
 		
 		stroke(255, 129, 94);
 		strokeWeight(2);
@@ -81,6 +80,9 @@ public class Main extends PApplet {
 	}
 	
 	
+	/**
+	 * Handles keyboard key presses.
+	 */
 	public void keyPressed() {
 		if (key=='s' || key=='S') {
 			saveFrame(timestamp()+"_##.png");
@@ -89,33 +91,33 @@ public class Main extends PApplet {
 	
 	
 	/**
-	 * Set up the camera.
+	 * Sets up the camera.
 	 */
 	private void setupCamera() {
-		camScene = new Scene(this);
+		_camScene = new Scene(this);
 		// Create an InteractiveFrame within which to draw the sphere, and set the Scene so that this Interactive Frame
 		// is always in focus. This will allow us to manipulate the sphere's coordinate system without manipulating the 
 		// world's coordinate system.
-		camScene.setInteractiveFrame(new InteractiveFrame(camScene));
+		_camScene.setInteractiveFrame(new InteractiveFrame(_camScene));
 		//camScene.interactiveFrame().rotate(new Quaternion(1, 0, 0, HALF_PI)); // This rotates the entire InteractiveFrame.
-		camScene.setDrawInteractiveFrame();
+		_camScene.setDrawInteractiveFrame();
 		
 		// Do not draw the world grid or axes.
-		camScene.setGridIsDrawn(false);
-		camScene.setAxisIsDrawn(false);
+		_camScene.setGridIsDrawn(false);
+		_camScene.setAxisIsDrawn(false);
 		
-		camScene.interactiveFrame().setSpinningFriction(0.7f);
-		camScene.interactiveFrame().setTossingFriction(0.7f);
-		camScene.setRadius(modelRadius * 1.2f);
+		_camScene.interactiveFrame().setSpinningFriction(0.7f);
+		_camScene.interactiveFrame().setTossingFriction(0.7f);
+		_camScene.setRadius(_modelRadiusNbr * 1.2f);
 		
 		// We will use only the arcball camera profile.
-		camScene.unregisterCameraProfile("FIRST_PERSON");
-		camScene.unregisterCameraProfile("THIRD_PERSON");
-		camScene.unregisterCameraProfile("WHEELED_ARCBALL");
+		_camScene.unregisterCameraProfile("FIRST_PERSON");
+		_camScene.unregisterCameraProfile("THIRD_PERSON");
+		_camScene.unregisterCameraProfile("WHEELED_ARCBALL");
 		
 		// Remove some functionality from our arcball camera profile because we don't want the user
 		// to be able to do things such as move the camera.
-		CameraProfile arcballProfile = camScene.getCameraProfiles()[0];
+		CameraProfile arcballProfile = _camScene.getCameraProfiles()[0];
 		arcballProfile.removeAllShortcuts();
 		
 		// The normal SHIFT+LEFT_ARROW action is to zoom, which we do not want.
@@ -123,10 +125,15 @@ public class Main extends PApplet {
 		// Currently middle and right mouse keys are not working in Proscene in Processing 2.
 		arcballProfile.setCameraMouseBinding(Event.SHIFT, RIGHT, Scene.MouseAction.ROTATE);
 		
-		camScene.showAll();
+		_camScene.showAll();
 	}
 	
 	
+	/**
+	 * Gets the current timestamp, formatted.
+	 * 
+	 * @return Formatted timestamp.
+	 */
 	static private String timestamp() {
 		  Calendar now = Calendar.getInstance();
 		  return String.format("%1$ty%1$tm%1$td_%1$tH%1$tM%1$tS", now);
