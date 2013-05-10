@@ -2,11 +2,11 @@
 <classpath>
 	<classpathentry kind="src" path="src"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
-	<classpathentry kind="lib" path="core.jar"/>
-	<classpathentry kind="lib" path="gluegen-rt-natives-macosx-universal.jar"/>
-	<classpathentry kind="lib" path="gluegen-rt.jar"/>
-	<classpathentry kind="lib" path="jogl-all-natives-macosx-universal.jar"/>
-	<classpathentry kind="lib" path="jogl-all.jar"/>
-	<classpathentry kind="lib" path="proscene.jar"/>
+	<classpathentry kind="lib" path="libraries/core.jar"/>
+	<classpathentry kind="lib" path="libraries/gluegen-rt-natives-macosx-universal.jar"/>
+	<classpathentry kind="lib" path="libraries/gluegen-rt.jar"/>
+	<classpathentry kind="lib" path="libraries/jogl-all-natives-macosx-universal.jar"/>
+	<classpathentry kind="lib" path="libraries/jogl-all.jar"/>
+	<classpathentry kind="lib" path="libraries/proscene.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
