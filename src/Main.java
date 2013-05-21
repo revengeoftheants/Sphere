@@ -1,80 +1,116 @@
 import java.util.*;
 import processing.core.*;
 import processing.event.*;
+import ddf.minim.*;
 import remixlab.proscene.*;
 
 
-//***we will work in KILOMETERS and RADIANS***
-
+/**
+ * 
+ * @author Kevin Dean
+ *
+ */
 public class Main extends PApplet {
-
-	float _modelResNbr = 5;
-	float _modelRadiusNbr = (float) 300.0;	//mean radius of the model in pixels (so that it fits into the viewport)
+	
+	// ***************************************
+	// Global Constants
+	// ***************************************
+	String EXT_DAT_FILE_PATH_TXT = "Song of Los_Minim_FFTFreqBand_FrameRate30_BufferSize1024.txt";
+	int TARGET_FRAME_RATE = 30;
+	
+	// *************
+	// Global Variables
+	// *************
+	float _modelResNbr = 10;
+	float _modelRadiusLenNbr = (float) 300.0;	//mean radius of the model in pixels (so that it fits into the viewport)
+	Sphere _sphere;
+	Minim _minim;
+	AudioPlayer _player;
 	Scene _camScene;
-	Sphere _thisSphere;
 	
 	
+	// ***************************************
+	// Public Methods
+	// ***************************************
+	/**
+	 * Main method for running outside the Processing IDE.
+	 * 
+	 * @param args
+	 */
 	public static void main(String args[]) {
 		PApplet.main(new String[] { "Main" });
 	}
 
 	
+	/**
+	 * Setup.
+	 */
 	public void setup() {
 		size(1200, 800, P3D);
-		frameRate(1);
+		frameRate(TARGET_FRAME_RATE);
 		
 		setupCamera();
 		
-		_thisSphere = new Sphere(this, _modelResNbr, _modelRadiusNbr);
+		_sphere = new Sphere(this, _modelResNbr, _modelRadiusLenNbr, EXT_DAT_FILE_PATH_TXT);
+		
+		_minim = new Minim(this);
+		_player = _minim.loadFile("Song of Los.wav", 1024);
 	}
 	
 	
-	public void draw() {
+	/**
+	 * Draw loop.
+	 */
+	public void draw() {		
 		background(109,108,120);
 		smooth();
 		ambientLight(128, 128, 128);
 		directionalLight(128, 128, 128, 0, 0, -1);
 		lightFalloff(1, 0, 0);
 		lightSpecular(0, 0, 0);
-        
-        _thisSphere.createVertices();
+		
+		text("Frame rate: " + frameRate, -550, -350);
+		
+        //_sphere.createVertices((frameCount % _sphere.rtrvAudioFrameCnt()) - 1);
+		//_sphere.createVertices(millis()/TARGET_FRAME_RATE);
         
         // Draw the body inside its own InteractiveFrame. You must apply its transformation in order to use its coordinate system.
         pushMatrix();
         _camScene.interactiveFrame().applyTransformation();
-        //camScene.drawAxis(modelRadius + 50);
+        //_camScene.drawAxis(_modelRadiusLenNbr + 50);
         
-		//stroke(255, 129, 94);
 		strokeWeight(1);
         fill(255, 94, 94);
         
         rotateX(HALF_PI);
-		_thisSphere.drawSphere();
+		_sphere.drawSphere((frameCount % _sphere.rtrvAudioFrameCnt()) - 1);
 		
-		stroke(255, 129, 94);
-		strokeWeight(2);
-
-		//theMoon.drawCraters();
 		popMatrix();
+		
+		if (frameCount > 1 && _player.isPlaying() == false) {
+			exit();
+		} else if (frameCount == 1) {
+			_player.play();
+		}
 	}
 	
 	
 	/**
 	 * Transforms spherical coordinates to Cartesian (rectilinear) coordinates.
 	 * 
-	 * @param lat
-	 * @param lng
-	 * @param elev
+	 * @param inpLatitudeDegNbr
+	 * @param inpLongitudeDegNbr
+	 * @param inpRadiusLenNbr
 	 * @return
 	 */
-	static public PVector toCartesian(float lat, float lng, float elev) {
+	static public PVector toCartesian(float inpLatitudeDegNbr, float inpLongitudeDegNbr, float inpRadiusLenNbr) {
 		
 		// The polar angle lies in the domain 0-180deg and is equal to 90deg - latitude.
-		float polarAngleDegrees = 90 - lat;
+		float polarAngleDegNbr = 90 - inpLatitudeDegNbr;
 
-		double x = elev * Math.cos(Math.toRadians(lng)) * Math.sin(Math.toRadians(polarAngleDegrees));
-		double y = elev * Math.sin(Math.toRadians(lng)) * Math.sin(Math.toRadians(polarAngleDegrees));
-		double z = elev * Math.cos(Math.toRadians(polarAngleDegrees));
+		double x = inpRadiusLenNbr * Math.cos(Math.toRadians(inpLongitudeDegNbr)) * Math.sin(Math.toRadians(polarAngleDegNbr));
+		double y = inpRadiusLenNbr * Math.sin(Math.toRadians(inpLongitudeDegNbr)) * Math.sin(Math.toRadians(polarAngleDegNbr));
+		double z = inpRadiusLenNbr * Math.cos(Math.toRadians(polarAngleDegNbr));
 
 		return new PVector((float) x,(float) y,(float) z);
 	}
@@ -91,10 +127,26 @@ public class Main extends PApplet {
 	
 	
 	/**
+	 * Performs cleanup when program terminates.
+	 */
+	public void stop() {
+		_player.close();
+		_minim.stop();
+		super.stop();
+	}
+	
+	
+	
+	// ***************************************
+	// Private Methods
+	// ***************************************
+	
+	/**
 	 * Sets up the camera.
 	 */
 	private void setupCamera() {
 		_camScene = new Scene(this);
+		_camScene.setFrameRate(TARGET_FRAME_RATE);
 		// Create an InteractiveFrame within which to draw the sphere, and set the Scene so that this Interactive Frame
 		// is always in focus. This will allow us to manipulate the sphere's coordinate system without manipulating the 
 		// world's coordinate system.
@@ -108,7 +160,7 @@ public class Main extends PApplet {
 		
 		_camScene.interactiveFrame().setSpinningFriction(0.7f);
 		_camScene.interactiveFrame().setTossingFriction(0.7f);
-		_camScene.setRadius(_modelRadiusNbr * 1.2f);
+		_camScene.setRadius(_modelRadiusLenNbr * 1.2f);
 		
 		// We will use only the arcball camera profile.
 		_camScene.unregisterCameraProfile("FIRST_PERSON");

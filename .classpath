@@ -8,5 +8,12 @@
 	<classpathentry kind="lib" path="libraries/jogl-all-natives-macosx-universal.jar"/>
 	<classpathentry kind="lib" path="libraries/jogl-all.jar"/>
 	<classpathentry kind="lib" path="libraries/proscene.jar"/>
+	<classpathentry kind="lib" path="libraries/jl1.0.jar"/>
+	<classpathentry kind="lib" path="libraries/jsminim.jar"/>
+	<classpathentry kind="lib" path="libraries/minim-spi.jar"/>
+	<classpathentry kind="lib" path="libraries/minim.jar"/>
+	<classpathentry kind="lib" path="libraries/mp3spi1.9.4.jar"/>
+	<classpathentry kind="lib" path="libraries/tritonus_aos.jar"/>
+	<classpathentry kind="lib" path="libraries/tritonus_share.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

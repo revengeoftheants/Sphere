@@ -1,167 +1,311 @@
 import java.util.ArrayList;
 
+import javax.xml.soap.Text;
+
+import com.sun.xml.internal.bind.v2.runtime.output.InPlaceDOMOutput;
+
 import processing.core.*;
+import sun.awt.image.OffScreenImage;
 
 public class Sphere {
-	
-	int MAX_RADIUS_DIFF_NBR = 50;
-	float NOISE_SCALE_NBR = 1.0f;
+
+	// ***************************************
+	// Global constants.
+	// ***************************************
+	String DELIMITER_TXT = "~";
+	float AMPLITUDE_SCALE_NBR = 2.5f;
+	float HGHT_INTERPOLATION_NBR = 0.03f;
 	int FROM_CLR_NBR, TO_CLR_NBR;
-	
+
+	// ***************************************
+	// Global variables.
+	// ***************************************
 	PApplet _parApp;
-	float _resNbr; //resolution of sphere
-	int _latResNbr;
-	int _lngResNbr;
+	float[] _latitudeDegs, _longitudeDegs, _radiusLenNbrs, _audioFrameDataVals;
+	float _resNbr;
+	int _latitudeLnCnt, _longitudeLnCnt;
 	float _modelRadiusNbr; //mean radius of the model (so that it fits into the viewport)
 	float _zOffsetNbr = 0;
 	float _tmNbr = 0;
 	int _fillClrNbr = 0;
 	float _lerpClrAmt = 0;
-	float _lerpClrDiffAmt = 0;
-	ArrayList<LatitudeStrip> _strips; 	//we then need an HashMap to hold each latitude strip (key: latitude)
+	float[][] _musicData;
+	String _loadFilePathTxt;
+	int _audioFrameCnt, _frameDataCntNbr, _vertexCnt;
 
-	
-	public Sphere(PApplet inpParApp, float inpResNbr, float modelRadValue) {
+
+	/**
+	 * Constructor.
+	 * 
+	 * @param inpParApp  Parent PApplet.
+	 * @param inpResNbr  Resolution of the sphere.
+	 * @param inpModelRadiusNbr  Radius of the sphere.
+	 * @param inpExtDatFilePathTxt  Path to an external data file for manipulating the sphere.
+	 */
+	public Sphere(PApplet inpParApp, float inpResNbr, float inpModelRadiusNbr, String inpExtDatFilePathTxt) {
 		_parApp = inpParApp;
 		_resNbr = inpResNbr;
-		_modelRadiusNbr = modelRadValue;
-		
-		_latResNbr = (int)(180/_resNbr);
-		_lngResNbr = (int)(360/_resNbr);
-		
+		_modelRadiusNbr = inpModelRadiusNbr;
+
+		_latitudeLnCnt = (int)(180/_resNbr);
+		_longitudeLnCnt = (int)(360/_resNbr);
+
+		// The number of vertices is the number of longitudinal lines multiplied by the number of latitudinal lines minus 1, plus 2 vertices for the poles.
+		int vertexCnt = _longitudeLnCnt * (_latitudeLnCnt - 1) + 2;
+		_latitudeDegs = new float[vertexCnt];
+		_longitudeDegs = new float[vertexCnt];
+		_radiusLenNbrs = new float[vertexCnt];
+
+		//createVertices(0);
+		crteVertices();
+
 		FROM_CLR_NBR = _parApp.color(144, 29, 31);
 		TO_CLR_NBR = _parApp.color(215, 180, 15);
-	}
-	
-	public void createVertices() {  //load all the non-crater vertices according to the resolution
-		float xOffsetNbr = 0;
-		float yOffsetNbr = 0;
-		_tmNbr += 0.01;
-		_strips = new ArrayList<LatitudeStrip>();
-		
-		for(int i = -_latResNbr/2; i <= _latResNbr/2; i++) {
-			float lat = _resNbr * i;
-			float cosAngle = PApplet.cos(PApplet.radians(90 - lat));
-			float sinAngle = PApplet.sin(PApplet.radians(_resNbr * -_lngResNbr/2));
-			
-			/*
-			float noiseValue = parent.noise(NOISE_SCALE_NBR * cosAngle + NOISE_SCALE_NBR, 
-											NOISE_SCALE_NBR * sinAngle + NOISE_SCALE_NBR,
-											timeNbr);
-			*/
-			float noiseNbr = _parApp.random(0, MAX_RADIUS_DIFF_NBR);
-			
-			PVector initVector = Main.toCartesian(lat, 0, _modelRadiusNbr + noiseNbr);
-			
-			/*
-			for (Crater thisCrater : craters) {
-				if (thisCrater.isPointInsideCrater(initVector)) {
-					initVector = Main.toCartesian(lat, 0, modelRadius - (3 * mapToScreen((float)thisCrater.getDepth())));
-				}
-			}
-			*/
-			
-			LatitudeStrip ls = new LatitudeStrip(_parApp, initVector);
-			
-			for(int j = -_lngResNbr/2; j <= _lngResNbr/2; j++) {
-				yOffsetNbr += 0.1;
-				float lng = _resNbr * j;
-				
-				cosAngle = PApplet.cos(PApplet.radians(90 - lat));
-				sinAngle = PApplet.sin(PApplet.radians(lng));
-				
-				if (lat == -90 || lat == 90) {
-					sinAngle = PApplet.sin(PApplet.radians(0));
-				}
-				/*
-				noiseValue = parent.noise(NOISE_SCALE_NBR * cosAngle + NOISE_SCALE_NBR,
-										  NOISE_SCALE_NBR * sinAngle + NOISE_SCALE_NBR,
-										  timeNbr);
-				*/
-				noiseNbr = _parApp.random(0, MAX_RADIUS_DIFF_NBR);
-				
-				PVector newVec = Main.toCartesian(lat, lng, _modelRadiusNbr + noiseNbr);
-				
-				/*
-				for (Crater thisCrater : craters) {
-					if (thisCrater.isPointInsideCrater(newVec)) {
-						newVec = Main.toCartesian(lat, lng, modelRadius - (3 * mapToScreen((float)thisCrater.getDepth())));
-					}
-				}
-				*/
-				ls.addPointToVertices(newVec);
-			}
-				
-			_strips.add(ls);
-			xOffsetNbr += 0.1;
-		}
-		
-		// The z-offset is used to add noise over time, so only increment it once per draw() loop.
-		_zOffsetNbr+=0.01;
-	}
-	
-	
-	/**
-	 * Draws the sphere.
-	 */
-	public void drawSphere() {
-        LatitudeStrip previousStrip = null;
-        PVector prevStripVertex, currStripVertex;
-        int cnt = 0;
-        
-    	int remainderNbr = _parApp.frameCount % 25;
-    	if (_fillClrNbr == 0 || remainderNbr == 0) {
-    		
-    		// A rate faster than 0.01 causes the color change to be noticeable.
-    		if (_lerpClrAmt <= 0 || (_lerpClrAmt < 1 && _lerpClrDiffAmt > 0)) {
-    			_lerpClrDiffAmt = 0.01f;
-    		} else if (_lerpClrAmt >= 1 || (_lerpClrAmt > 0 && _lerpClrDiffAmt < 0)) {
-    			_lerpClrDiffAmt = -0.01f;
-    		} else {
-    			_lerpClrDiffAmt = 0.01f;
-    		}
-    		
-    		_fillClrNbr = (int) PApplet.lerpColor(FROM_CLR_NBR, TO_CLR_NBR, _lerpClrAmt, PApplet.RGB);
-    		_lerpClrAmt += _lerpClrDiffAmt; // A rate faster than this causes the color change to be noticeable.
-    	}
-        
-        for(LatitudeStrip currentStrip : _strips) {
-        	if(cnt > 0) {
-				previousStrip = _strips.get(cnt-1);
-			}
-        	
-        	_parApp.beginShape(PConstants.TRIANGLE_STRIP);
-        	for(int j=0; j<currentStrip.vertices.length; j++) {
-				if(cnt > 0) {
-					prevStripVertex = previousStrip.vertices[j];
-					
-					_parApp.stroke(_fillClrNbr);
-					//_parApp.noStroke();
-					_parApp.fill(_fillClrNbr);
-					_parApp.vertex(prevStripVertex.x, prevStripVertex.y, prevStripVertex.z);
-				}
-				currStripVertex = currentStrip.vertices[j];
-				_parApp.vertex(currStripVertex.x, currStripVertex.y, currStripVertex.z);
-        	}
-        	_parApp.endShape();
-        	cnt++;
-        }
+
+		_loadFilePathTxt = inpExtDatFilePathTxt;
+
+		loadExtData();
 	}
 
-	
-	public void printVertices() {
-		for(LatitudeStrip ls : _strips) {
-			for(int i=0; i<ls.vertices.length; i++) {
-				PVector v = ls.vertices[i];
-				System.out.println(v.x + ", " + v.y + ", " + v.z);
+
+	// ***************************************
+	// Getters
+	// ***************************************
+	public int rtrvAudioFrameCnt() {
+		return _audioFrameCnt;
+	}
+
+
+	/**
+	 * Creates arrays to store data about all our vertices (i.e., latitude, longitude, and distance from center of sphere).
+	 */
+	public void crteVertices() {
+
+		// For each latitude we'll draw, we'll create a strip of vertices.
+		for(int latitudeDegNbr = -90; latitudeDegNbr <= 90; latitudeDegNbr += _resNbr) {
+
+			// If we're at the poles, we will create just one vertex since all the longitudes share the same vertex here.
+			if (PApplet.abs(latitudeDegNbr) == 90) {
+				int vertexIdx = calcVertexIdx(latitudeDegNbr, 0);
+				_latitudeDegs[vertexIdx] = latitudeDegNbr;
+				_longitudeDegs[vertexIdx] = 0;
+				_radiusLenNbrs[vertexIdx] = _modelRadiusNbr;
+			} else {
+				for(int longitudeDegNbr = -180; longitudeDegNbr <= 180; longitudeDegNbr += _resNbr) {
+					int vertexIdx = calcVertexIdx(latitudeDegNbr, longitudeDegNbr);
+					_latitudeDegs[vertexIdx] = latitudeDegNbr;
+					_longitudeDegs[vertexIdx] = longitudeDegNbr;
+					_radiusLenNbrs[vertexIdx] = _modelRadiusNbr;
+				}
 			}
 		}
 	}
-	
-	/*
-	public float mapToScreen(float initRadius) { //a function for mapping the radius of each point of the sphere from kilometers to screen pixels
-		float screenRadius = PApplet.map(initRadius, 0, planetRadius, 0, modelRadius);
-		return screenRadius;
+
+
+	/**
+	 * Draws the vertices to the screen.
+	 * 
+	 * @param inpAudioFrameIdx  The audio frame to reference for height data.
+	 */
+	public void drawSphere(int inpAudioFrameIdx) {
+		_audioFrameDataVals = rtrvAudioFrameData(inpAudioFrameIdx);
+		float prevAudioFrameLvlNbr, currAudioFrameLvlNbr;
+
+		if (inpAudioFrameIdx > 0) {
+			prevAudioFrameLvlNbr = rtrvAudioFrameData(inpAudioFrameIdx - 1)[0];
+		} else {
+			prevAudioFrameLvlNbr = 0;
+		}
+
+		currAudioFrameLvlNbr = rtrvAudioFrameData(inpAudioFrameIdx)[0];
+
+		//_parApp.noStroke();
+		_parApp.stroke(_fillClrNbr);
+		_lerpClrAmt = _parApp.frameCount / (float)_musicData.length;
+		_fillClrNbr = (int) PApplet.lerpColor(FROM_CLR_NBR, TO_CLR_NBR, _lerpClrAmt, PApplet.RGB);
+		_parApp.fill(_fillClrNbr);
+
+		float newVertexHghtNbr = 0, adjacentLatitudeLnLatitudeDegNbr = 0, adjacentLatitudeLnLongitudeDegNbr = 0, adjacentLatitudeLnRadiusLenNbr = 0,
+				currLatitudeLnLatitudeDegNbr = 0, currLatitudeLnLongitudeDegNbr = 0;
+		PVector adjacentVertex, currVertex;
+		int adjacentLatitudeVertexIdx = 0, currLatitudeVertexIdx = 0;
+
+		for (int latitudeDegNbr = -90; latitudeDegNbr <= 90; latitudeDegNbr += _resNbr) {
+
+			if (PApplet.abs(latitudeDegNbr) == 90) {
+				// Create Triangle Fans for each of the poles.
+				_parApp.beginShape(PApplet.TRIANGLE_FAN);
+
+				// Draw the pole vertex.
+				currLatitudeVertexIdx = calcVertexIdx(latitudeDegNbr, 0);
+				newVertexHghtNbr = calcAndStoreNewVertexHghtNbr(currLatitudeVertexIdx, prevAudioFrameLvlNbr, currAudioFrameLvlNbr);
+				currVertex = Main.toCartesian(latitudeDegNbr, 0, newVertexHghtNbr);
+				//_parApp.text("Lat: " + latitudeDegNbr, currVertex.x, currVertex.y, currVertex.z + 20);
+				_parApp.vertex(currVertex.x, currVertex.y, currVertex.z);
+
+				float adjacentLatitudeDegNbr;
+
+				if (latitudeDegNbr == -90) {
+					adjacentLatitudeDegNbr = latitudeDegNbr + _resNbr;
+				} else {
+					adjacentLatitudeDegNbr = latitudeDegNbr - _resNbr;
+				}
+
+				// In order to complete the sphere, you have to go completely around the circle (i.e., include both -180 and 180).
+				for(int longitudeDegNbr = -180; longitudeDegNbr <= 180; longitudeDegNbr += _resNbr) {
+
+					adjacentLatitudeVertexIdx = calcVertexIdx(adjacentLatitudeDegNbr, longitudeDegNbr);
+
+					if (longitudeDegNbr == 180) {
+						// When we complete the circle, use the heights that we used for longitude = -180 to stitch the mesh together.
+						newVertexHghtNbr = _radiusLenNbrs[calcVertexIdx(adjacentLatitudeDegNbr, -180)];
+					} else {
+						// If we're building the second pole, we need to stitch it to the previous ring.
+						if (adjacentLatitudeDegNbr == latitudeDegNbr - _resNbr) {
+							adjacentLatitudeVertexIdx = calcVertexIdx(adjacentLatitudeDegNbr, longitudeDegNbr);
+							newVertexHghtNbr = _radiusLenNbrs[adjacentLatitudeVertexIdx];
+						} else {
+							newVertexHghtNbr = calcAndStoreNewVertexHghtNbr(adjacentLatitudeVertexIdx, prevAudioFrameLvlNbr, currAudioFrameLvlNbr);
+						}
+					}
+
+					adjacentVertex = Main.toCartesian(adjacentLatitudeDegNbr, longitudeDegNbr, newVertexHghtNbr);
+					_parApp.vertex(adjacentVertex.x, adjacentVertex.y, adjacentVertex.z);
+				}
+
+				_parApp.endShape();
+			} else if (latitudeDegNbr - _resNbr != -90) {
+				// We already built a triangle fan for the first pole, so we do not want to build a triangle strip over it.
+				_parApp.beginShape(PConstants.TRIANGLE_STRIP);
+
+				// In order to complete the sphere, you have to go completely around the circle (i.e., include both -180 and 180).
+				for (int longitudeDegNbr = -180; longitudeDegNbr <= 180; longitudeDegNbr += _resNbr) {
+
+					if (PApplet.abs(latitudeDegNbr) < 90) {
+						adjacentLatitudeVertexIdx = calcVertexIdx(latitudeDegNbr - _resNbr, longitudeDegNbr);
+						adjacentLatitudeLnLatitudeDegNbr = _latitudeDegs[adjacentLatitudeVertexIdx];
+						adjacentLatitudeLnLongitudeDegNbr = _longitudeDegs[adjacentLatitudeVertexIdx];
+						adjacentLatitudeLnRadiusLenNbr = _radiusLenNbrs[adjacentLatitudeVertexIdx];
+
+						adjacentVertex = Main.toCartesian(adjacentLatitudeLnLatitudeDegNbr, adjacentLatitudeLnLongitudeDegNbr, adjacentLatitudeLnRadiusLenNbr);				
+						_parApp.vertex(adjacentVertex.x, adjacentVertex.y, adjacentVertex.z);
+					}
+
+					currLatitudeVertexIdx = calcVertexIdx(latitudeDegNbr, longitudeDegNbr);
+					currLatitudeLnLatitudeDegNbr = _latitudeDegs[currLatitudeVertexIdx];
+					currLatitudeLnLongitudeDegNbr = _longitudeDegs[currLatitudeVertexIdx];
+
+					if (longitudeDegNbr == 180) {
+						// When we complete the circle, use the heights that we used for longitude = -180 to stitch the mesh together.
+						newVertexHghtNbr = _radiusLenNbrs[calcVertexIdx(latitudeDegNbr, -180)];
+					} else {
+						newVertexHghtNbr = calcAndStoreNewVertexHghtNbr(currLatitudeVertexIdx, prevAudioFrameLvlNbr, currAudioFrameLvlNbr);
+					}
+
+					currVertex = Main.toCartesian(currLatitudeLnLatitudeDegNbr, currLatitudeLnLongitudeDegNbr, newVertexHghtNbr);
+					_parApp.vertex(currVertex.x, currVertex.y, currVertex.z);
+				}
+				_parApp.endShape();
+			}
+		}
 	}
-	*/
+
+
+
+	// ***************************************
+	// Private Methods
+	// ***************************************
+
+	/**
+	 * Calculates the index of a vertex in our vertex arrays given its latitude and longitude.
+	 * 
+	 * @param inpLatitudeDegNbr  The latitude of the vertex in degrees.
+	 * @param inpLongitudeDegNbr  The longitude of the vertex in degrees.
+	 * @return The index of the vertex.
+	 */
+	private int calcVertexIdx(float inpLatitudeDegNbr, float inpLongitudeDegNbr) {
+
+		int rtnIdx = 0;
+
+		// First, since the domains of latitude and longitude are [-90, 90] and [-180, 180] respectively, we will convert the
+		// parameters to the domains [0, 180] and [0, 360].
+		inpLatitudeDegNbr += 90;
+		inpLongitudeDegNbr += 180;
+
+		// Longitude of 360 degrees is actually just the same as 0 degrees.
+		if (inpLongitudeDegNbr == 360) {
+			inpLongitudeDegNbr = 0;
+		}
+
+		if (inpLatitudeDegNbr == 0) {
+			rtnIdx = 0;
+		} else if (inpLatitudeDegNbr == 180) {
+			rtnIdx = _latitudeDegs.length - 1;
+		} else {
+			// Subtract the longitudinal line count, because we didn't create these vertices for the poles, 
+			// but add 1 for the universal vertex that we did create.
+			rtnIdx = (int) (((inpLatitudeDegNbr / _resNbr) * _longitudeLnCnt) + (int)(inpLongitudeDegNbr / _resNbr)) - _longitudeLnCnt + 1;
+		}
+
+		return rtnIdx;
+	}
+
+
+	/**
+	 * Loads data from external sources.
+	 */
+	private void loadExtData() {
+		String[] audioFrameAnalysisTxt = _parApp.loadStrings(_loadFilePathTxt);
+		_audioFrameCnt = audioFrameAnalysisTxt.length;
+
+		_frameDataCntNbr = audioFrameAnalysisTxt[0].split(DELIMITER_TXT).length;
+		_musicData = new float[_audioFrameCnt][_frameDataCntNbr];
+
+		for (int audioFrameIdx = 0; audioFrameIdx < _audioFrameCnt - 1; audioFrameIdx++) {
+			String bufferTxt = audioFrameAnalysisTxt[audioFrameIdx];
+			String[] bufferVals = bufferTxt.split(DELIMITER_TXT);
+
+			for (int bufferIdx = 0; bufferIdx < _frameDataCntNbr; bufferIdx++) {
+				_musicData[audioFrameIdx][bufferIdx] = Float.parseFloat(bufferVals[bufferIdx]);
+			}
+		}
+	}
+
+
+	/**
+	 * Retrieves the data associated with a given audio frame.
+	 * 
+	 * @param inpFrameIdx  Index of the desired audio frame.
+	 * @return Array of float values representing the data for this audio frame.
+	 */
+	private float[] rtrvAudioFrameData(int inpFrameIdx) {
+		float[] rtnFrameData = new float[_frameDataCntNbr];
+
+		inpFrameIdx = PApplet.constrain(inpFrameIdx, 0, _audioFrameCnt - 1);
+
+		for (int bufferIdx = 0; bufferIdx < _frameDataCntNbr; bufferIdx++) {
+			rtnFrameData[bufferIdx] = _musicData[inpFrameIdx][bufferIdx];
+		}
+
+		return rtnFrameData;
+	}
+
+
+	/**
+	 * Calculates the new height to assign to a vertex and stores that value in our array of vertex heights.
+	 * 
+	 * @param inpVertexIdx  The index of this vertex in our arrays.
+	 * @param inpPrevAudioFrameLvlNbr  The level number of the previous audio frame.
+	 * @param inpCurrAudioFrameLvlNbr  The level number of the current audio frame.
+	 * 
+	 * @return  The height at which to draw the vertex.
+	 */
+	private float calcAndStoreNewVertexHghtNbr(int inpVertexIdx, float inpPrevAudioFrameLvlNbr, float inpCurrAudioFrameLvlNbr) {
+		float rtnVertexHghtNbr = 0;
+
+		rtnVertexHghtNbr = _modelRadiusNbr + _parApp.random(0, AMPLITUDE_SCALE_NBR * PApplet.lerp(inpPrevAudioFrameLvlNbr, inpCurrAudioFrameLvlNbr, HGHT_INTERPOLATION_NBR));
+
+		_radiusLenNbrs[inpVertexIdx] = rtnVertexHghtNbr;
+		return rtnVertexHghtNbr;
+	}
 }
